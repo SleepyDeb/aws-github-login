@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AWS Cognito OAuth Login</title>
+</head>
+
+<body>
+    <h1>Login with AWS (Cognito OAuth2)</h1>
+    <button id="login-btn">Login with AWS</button>
+    <button id="logout-btn" style="display:none;">Logout</button>
+    <div id="result"></div>
+
+    <script>
+        const cognitoDomain = "https://YOUR_COGNITO_DOMAIN.auth.YOUR_REGION.amazoncognito.com";
+        const clientId = "YOUR_APP_CLIENT_ID";
+        const redirectUri = "https://sleepydeb.github.io/YOUR_REPO/"; // Change to your GH Pages URL
+        const responseType = "code";
+        const scope = "openid+profile+email";
+        const logoutUri = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(redirectUri)}`;
+
+        // Helper to parse query parameters
+        function getQueryParam(name) {
+            return new URLSearchParams(window.location.search).get(name);
+        }
+
+        // Redirect to Cognito for Login
+        document.getElementById('login-btn').onclick = function () {
+            const authUrl =
+                `${cognitoDomain}/oauth2/authorize?response_type=${responseType}&client_id=${clientId}` +
+                `&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+            window.location = authUrl;
+        };
+
+        // Handle OAuth2 callback
+        async function handleAuthCode() {
+            const code = getQueryParam('code');
+            if (!code) return;
+
+            document.getElementById('result').textContent = 'Exchanging code for tokens...';
+
+            // Exchange code for tokens (must be done via a backend or CORS-enabled custom endpoint)
+            // For demo, using AWS Cognito's /token endpoint directly (works if CORS is enabled; otherwise use a backend server)
+            const data = new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                client_id: clientId,
+                redirect_uri: redirectUri
+            });
+
+            try {
+                const resp = await fetch(`${cognitoDomain}/oauth2/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: data.toString()
+                });
+
+                if (!resp.ok) throw new Error('Token exchange failed');
+                const tokenResp = await resp.json();
+
+                // Display ID token (JWT) for demo
+                document.getElementById('result').textContent =
+                    `ID Token: ${tokenResp.id_token.substr(0, 40)}...`;
+
+                // Store token in localStorage
+                localStorage.setItem('id_token', tokenResp.id_token);
+                document.getElementById('login-btn').style.display = 'none';
+                document.getElementById('logout-btn').style.display = '';
+                // Remove the code from the URL
+                window.history.replaceState({}, document.title, redirectUri);
+            } catch (err) {
+                document.getElementById('result').textContent = 'Error: ' + err;
+            }
+        }
+
+        // Logout handler
+        document.getElementById('logout-btn').onclick = function () {
+            localStorage.removeItem('id_token');
+            window.location = logoutUri;
+        };
+
+        // On page load, see if we have a code (and not already logged in)
+        if (getQueryParam('code')) {
+            handleAuthCode();
+        } else if (localStorage.getItem('id_token')) {
+            document.getElementById('result').textContent = 'You are logged in!';
+            document.getElementById('login-btn').style.display = 'none';
+            document.getElementById('logout-btn').style.display = '';
+        }
+
+    </script>
+</body>
+
+</html>
