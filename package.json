@@ -1,0 +1,16 @@
+{
+  "name": "aws-github-login",
+  "version": "1.0.0",
+  "description": "GitHub OAuth with PKCE - Bundled App",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "npx parcel build index.html --dist-dir dist"
+  },
+  "devDependencies": {
+    "parcel": "^2.11.0",
+    "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.0"
+  }
+}
