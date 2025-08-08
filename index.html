@@ -81,7 +81,7 @@
             authUrl.searchParams.append('client_id', GITHUB_CLIENT_ID);
             authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
             authUrl.searchParams.append('response_type', 'code');
-            authUrl.searchParams.append('scope', 'profile email'); // Request read access to user profile
+            authUrl.searchParams.append('scope', 'openid profile email'); // Request read access to user profile
             authUrl.searchParams.append('code_challenge', codeChallenge);
             authUrl.searchParams.append('code_challenge_method', 'S256');
 
@@ -106,7 +106,7 @@
             params.append('code', code);
             params.append('code_verifier', codeVerifier);
             params.append('redirect_uri', REDIRECT_URI);
-            params.append('grant_type', 'authorization_code');
+            params.append('grant_type', 'authorization_code');            
 
             const tokenUrl = 'https://sleepydev.eu.auth0.com/oauth/token';
 
