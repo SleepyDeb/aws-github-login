@@ -31,10 +31,11 @@
     <div id="error" style="display:none;"></div>
 
     <script>
+        // https://sleepydev.eu.auth0.com/.well-known/openid-configuration
         // ---------------------------------------------------------------------
         // CONFIGURATION: Replace with your GitHub OAuth App's Client ID
         // ---------------------------------------------------------------------
-        const GITHUB_CLIENT_ID = 'Ov23liNe5UXLYATbyWum';
+        const GITHUB_CLIENT_ID = 'XCaSnYut7Tl4ubdR7pKzkjBym19JRoBl';
         const REDIRECT_URI = 'https://sleepydeb.github.io/aws-github-login/index.html';
 
         const loginButton = document.getElementById('loginButton');
@@ -76,7 +77,7 @@
 
             const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-            const authUrl = new URL('https://github.com/login/oauth/authorize');
+            const authUrl = new URL('https://sleepydev.eu.auth0.com/authorize');
             authUrl.searchParams.append('client_id', GITHUB_CLIENT_ID);
             authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
             authUrl.searchParams.append('response_type', 'code');
@@ -107,7 +108,7 @@
             params.append('redirect_uri', REDIRECT_URI);
             params.append('grant_type', 'authorization_code');
 
-            const tokenUrl = 'https://github.com/login/oauth/access_token';
+            const tokenUrl = 'https://sleepydev.eu.auth0.com/oauth/token';
 
             const response = await fetch(tokenUrl, {
                 method: 'POST',
@@ -136,7 +137,7 @@
          * Fetches user data from the GitHub API using the access token.
          */
         async function fetchGitHubUser(accessToken) {
-            const userUrl = 'https://api.github.com/user';
+            const userUrl = 'https://sleepydev.eu.auth0.com/userinfo';
             const response = await fetch(userUrl, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`
