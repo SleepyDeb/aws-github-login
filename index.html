@@ -97,22 +97,31 @@
                 return;
             }
 
+            // --- START: Changes for the fix ---
+            
+            // Create the body as URLSearchParams
+            const params = new URLSearchParams();
+            params.append('client_id', GITHUB_CLIENT_ID);
+            params.append('code', code);
+            params.append('code_verifier', codeVerifier);
+            params.append('redirect_uri', REDIRECT_URI);
+            params.append('grant_type', 'authorization_code');
+
             const tokenUrl = 'https://github.com/login/oauth/access_token';
 
             const response = await fetch(tokenUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json', // Ask for JSON response
+                    // The 'Accept' header tells GitHub to send the response in JSON format.
+                    'Accept': 'application/json',
+                    // DO NOT set the 'Content-Type' header. 
+                    // The browser will automatically set it to 'application/x-www-form-urlencoded' 
+                    // when the body is a URLSearchParams object.
                 },
-                body: JSON.stringify({
-                    client_id: GITHUB_CLIENT_ID,
-                    code: code,
-                    code_verifier: codeVerifier,
-                    redirect_uri: REDIRECT_URI,
-                    grant_type: 'authorization_code'
-                })
+                body: params // Use the URLSearchParams object as the body
             });
+
+            // --- END: Changes for the fix ---
 
             const data = await response.json();
 
@@ -122,7 +131,7 @@
             }
             return data.access_token;
         }
-
+        
         /**
          * Fetches user data from the GitHub API using the access token.
          */
