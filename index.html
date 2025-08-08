@@ -1,95 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>AWS Cognito OAuth Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub OAuth with PKCE</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        h1, h2 { color: #111; }
+        button { background-color: #24292e; color: white; border: none; padding: 10px 16px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #444; }
+        #userInfo, #error { margin-top: 20px; padding: 15px; border-radius: 6px; }
+        #userInfo { background-color: #f6f8fa; border: 1px solid #e1e4e8; }
+        #error { background-color: #ffeef0; border: 1px solid #f97583; color: #d73a49; }
+        pre { background-color: #f6f8fa; padding: 16px; overflow: auto; border-radius: 6px; }
+        code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; }
+    </style>
 </head>
-
 <body>
-    <h1>Login with AWS (Cognito OAuth2)</h1>
-    <button id="login-btn">Login with AWS</button>
-    <button id="logout-btn" style="display:none;">Logout</button>
-    <div id="result"></div>
+
+    <h1>GitHub OAuth with PKCE Example</h1>
+    <p>This page demonstrates a secure, client-side only GitHub OAuth2 login using the Authorization Code Flow with PKCE.</p>
+
+    <button id="loginButton">Login with GitHub</button>
+
+    <div id="userInfo" style="display:none;">
+        <h2>User Information</h2>
+        <pre><code id="userData"></code></pre>
+    </div>
+
+    <div id="error" style="display:none;"></div>
 
     <script>
-        const cognitoDomain = "https://YOUR_COGNITO_DOMAIN.auth.YOUR_REGION.amazoncognito.com";
-        const clientId = "YOUR_APP_CLIENT_ID";
-        const redirectUri = "https://sleepydeb.github.io/YOUR_REPO/"; // Change to your GH Pages URL
-        const responseType = "code";
-        const scope = "openid+profile+email";
-        const logoutUri = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(redirectUri)}`;
+        // ---------------------------------------------------------------------
+        // CONFIGURATION: Replace with your GitHub OAuth App's Client ID
+        // ---------------------------------------------------------------------
+        const GITHUB_CLIENT_ID = 'Ov23liNe5UXLYATbyWum';
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
 
-        // Helper to parse query parameters
-        function getQueryParam(name) {
-            return new URLSearchParams(window.location.search).get(name);
+        const loginButton = document.getElementById('loginButton');
+        const userInfoDiv = document.getElementById('userInfo');
+        const userDataCode = document.getElementById('userData');
+        const errorDiv = document.getElementById('error');
+
+        /**
+         * Generates a random string for the code verifier.
+         */
+        function generateCodeVerifier() {
+            const randomBytes = new Uint8Array(32);
+            window.crypto.getRandomValues(randomBytes);
+            return btoa(String.fromCharCode.apply(null, randomBytes))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
         }
 
-        // Redirect to Cognito for Login
-        document.getElementById('login-btn').onclick = function () {
-            const authUrl =
-                `${cognitoDomain}/oauth2/authorize?response_type=${responseType}&client_id=${clientId}` +
-                `&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
-            window.location = authUrl;
-        };
+        /**
+         * Hashes the code verifier to create the code challenge.
+         */
+        async function generateCodeChallenge(verifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode.apply(null, new Uint8Array(hashBuffer)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        }
 
-        // Handle OAuth2 callback
-        async function handleAuthCode() {
-            const code = getQueryParam('code');
-            if (!code) return;
+        /**
+         * Kicks off the login process by redirecting the user to GitHub.
+         */
+        async function redirectToGitHub() {
+            const codeVerifier = generateCodeVerifier();
+            sessionStorage.setItem('code_verifier', codeVerifier); // Store for later use
 
-            document.getElementById('result').textContent = 'Exchanging code for tokens...';
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-            // Exchange code for tokens (must be done via a backend or CORS-enabled custom endpoint)
-            // For demo, using AWS Cognito's /token endpoint directly (works if CORS is enabled; otherwise use a backend server)
-            const data = new URLSearchParams({
-                grant_type: 'authorization_code',
-                code: code,
-                client_id: clientId,
-                redirect_uri: redirectUri
+            const authUrl = new URL('https://github.com/login/oauth/authorize');
+            authUrl.searchParams.append('client_id', GITHUB_CLIENT_ID);
+            authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+            authUrl.searchParams.append('response_type', 'code');
+            authUrl.searchParams.append('scope', 'user:read'); // Request read access to user profile
+            authUrl.searchParams.append('code_challenge', codeChallenge);
+            authUrl.searchParams.append('code_challenge_method', 'S256');
+
+            window.location.href = authUrl.toString();
+        }
+
+        /**
+         * Exchanges the authorization code for an access token.
+         */
+        async function getAccessToken(code) {
+            const codeVerifier = sessionStorage.getItem('code_verifier');
+            if (!codeVerifier) {
+                showError("Error: Code verifier not found. Please try logging in again.");
+                return;
+            }
+
+            const tokenUrl = 'https://github.com/login/oauth/access_token';
+
+            const response = await fetch(tokenUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json', // Ask for JSON response
+                },
+                body: JSON.stringify({
+                    client_id: GITHUB_CLIENT_ID,
+                    code: code,
+                    code_verifier: codeVerifier,
+                    redirect_uri: REDIRECT_URI,
+                    grant_type: 'authorization_code'
+                })
             });
 
-            try {
-                const resp = await fetch(`${cognitoDomain}/oauth2/token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: data.toString()
-                });
+            const data = await response.json();
 
-                if (!resp.ok) throw new Error('Token exchange failed');
-                const tokenResp = await resp.json();
-
-                // Display ID token (JWT) for demo
-                document.getElementById('result').textContent =
-                    `ID Token: ${tokenResp.id_token.substr(0, 40)}...`;
-
-                // Store token in localStorage
-                localStorage.setItem('id_token', tokenResp.id_token);
-                document.getElementById('login-btn').style.display = 'none';
-                document.getElementById('logout-btn').style.display = '';
-                // Remove the code from the URL
-                window.history.replaceState({}, document.title, redirectUri);
-            } catch (err) {
-                document.getElementById('result').textContent = 'Error: ' + err;
+            if (data.error) {
+                showError(`Error: ${data.error_description}`);
+                return null;
             }
+            return data.access_token;
         }
 
-        // Logout handler
-        document.getElementById('logout-btn').onclick = function () {
-            localStorage.removeItem('id_token');
-            window.location = logoutUri;
+        /**
+         * Fetches user data from the GitHub API using the access token.
+         */
+        async function fetchGitHubUser(accessToken) {
+            const userUrl = 'https://api.github.com/user';
+            const response = await fetch(userUrl, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            return await response.json();
+        }
+
+        function displayUserInfo(user) {
+            loginButton.style.display = 'none';
+            userInfoDiv.style.display = 'block';
+            userDataCode.textContent = JSON.stringify(user, null, 2);
+        }
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // --- Main Logic ---
+
+        loginButton.addEventListener('click', redirectToGitHub);
+
+        // On page load, check if we're coming back from GitHub
+        window.onload = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+
+            if (code) {
+                // We have a code, so exchange it for an access token
+                history.replaceState({}, document.title, window.location.pathname); // Clean up URL
+                const accessToken = await getAccessToken(code);
+                if (accessToken) {
+                    const user = await fetchGitHubUser(accessToken);
+                    displayUserInfo(user);
+                }
+            }
         };
-
-        // On page load, see if we have a code (and not already logged in)
-        if (getQueryParam('code')) {
-            handleAuthCode();
-        } else if (localStorage.getItem('id_token')) {
-            document.getElementById('result').textContent = 'You are logged in!';
-            document.getElementById('login-btn').style.display = 'none';
-            document.getElementById('logout-btn').style.display = '';
-        }
-
     </script>
 </body>
-
 </html>
