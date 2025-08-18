@@ -1,4 +1,0 @@
-window.APP_CONFIG = {
-    GITHUB_CLIENT_ID: '__GITHUB_CLIENT_ID__',
-    REDIRECT_URI: '__REDIRECT_URI__'
-};
