@@ -1,183 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub OAuth with PKCE</title>
-    <link rel="stylesheet" href="theme.css">
-</head>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using @vitejs/plugin-react"
+    />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="/manifest.json" />
+    <title>React App</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
 
-<body>
-    <style>
-        body {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-        }
-    </style>
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
 
-    <h1>GitHub OAuth with PKCE Example</h1>
-    <p>This page demonstrates a secure, client-side only GitHub OAuth2 login using the Authorization Code Flow with PKCE.</p>
-
-    <button id="loginButton">Login with GitHub</button>
-
-    <div id="userInfo" style="display:none;">
-        <h2>User Information</h2>
-        <pre><code id="userData"></code></pre>
-    </div>
-
-    <div id="error" style="display:none;"></div>
-
-    <script src="config.js"></script>
-    <script>
-        // https://sleepydev.eu.auth0.com/.well-known/openid-configuration
-        // ---------------------------------------------------------------------
-        // CONFIGURATION: Replace with your GitHub OAuth App's Client ID
-        // ---------------------------------------------------------------------
-    const GITHUB_CLIENT_ID = window.APP_CONFIG.GITHUB_CLIENT_ID;
-    const REDIRECT_URI = window.APP_CONFIG.REDIRECT_URI;
-
-        const loginButton = document.getElementById('loginButton');
-        const userInfoDiv = document.getElementById('userInfo');
-        const userDataCode = document.getElementById('userData');
-        const errorDiv = document.getElementById('error');
-
-        /**
-         * Generates a random string for the code verifier.
-         */
-        function generateCodeVerifier() {
-            const randomBytes = new Uint8Array(32);
-            window.crypto.getRandomValues(randomBytes);
-            return btoa(String.fromCharCode.apply(null, randomBytes))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=/g, '');
-        }
-
-        /**
-         * Hashes the code verifier to create the code challenge.
-         */
-        async function generateCodeChallenge(verifier) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(verifier);
-            const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-            return btoa(String.fromCharCode.apply(null, new Uint8Array(hashBuffer)))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=/g, '');
-        }
-
-        /**
-         * Kicks off the login process by redirecting the user to GitHub.
-         */
-        async function redirectToGitHub() {
-            const codeVerifier = generateCodeVerifier();
-            sessionStorage.setItem('code_verifier', codeVerifier); // Store for later use
-
-            const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-            const authUrl = new URL('https://sleepydev.eu.auth0.com/authorize');
-            authUrl.searchParams.append('client_id', GITHUB_CLIENT_ID);
-            authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
-            authUrl.searchParams.append('response_type', 'code');
-            authUrl.searchParams.append('scope', 'openid profile email'); // Request read access to user profile
-            authUrl.searchParams.append('code_challenge', codeChallenge);
-            authUrl.searchParams.append('code_challenge_method', 'S256');
-
-            window.location.href = authUrl.toString();
-        }
-
-        /**
-         * Exchanges the authorization code for an access token.
-         */
-        async function getAccessToken(code) {
-            const codeVerifier = sessionStorage.getItem('code_verifier');
-            if (!codeVerifier) {
-                showError("Error: Code verifier not found. Please try logging in again.");
-                return;
-            }
-
-            // --- START: Changes for the fix ---
-            
-            // Create the body as URLSearchParams
-            const params = new URLSearchParams();
-            params.append('client_id', GITHUB_CLIENT_ID);
-            params.append('code', code);
-            params.append('code_verifier', codeVerifier);
-            params.append('redirect_uri', REDIRECT_URI);
-            params.append('grant_type', 'authorization_code');            
-
-            const tokenUrl = 'https://sleepydev.eu.auth0.com/oauth/token';
-
-            const response = await fetch(tokenUrl, {
-                method: 'POST',
-                headers: {
-                    // The 'Accept' header tells GitHub to send the response in JSON format.
-                    'Accept': 'application/json',
-                    // DO NOT set the 'Content-Type' header. 
-                    // The browser will automatically set it to 'application/x-www-form-urlencoded' 
-                    // when the body is a URLSearchParams object.
-                },
-                body: params // Use the URLSearchParams object as the body
-            });
-
-            // --- END: Changes for the fix ---
-
-            const data = await response.json();
-
-            if (data.error) {
-                showError(`Error: ${data.error_description}`);
-                return null;
-            }
-            return data.access_token;
-        }
-        
-        /**
-         * Fetches user data from the GitHub API using the access token.
-         */
-        async function fetchGitHubUser(accessToken) {
-            const userUrl = 'https://sleepydev.eu.auth0.com/userinfo';
-            const response = await fetch(userUrl, {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-            return await response.json();
-        }
-
-        function displayUserInfo(user) {
-            loginButton.style.display = 'none';
-            userInfoDiv.style.display = 'block';
-            userDataCode.textContent = JSON.stringify(user, null, 2);
-        }
-
-        function showError(message) {
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-
-        // --- Main Logic ---
-
-        loginButton.addEventListener('click', redirectToGitHub);
-
-        // On page load, check if we're coming back from GitHub
-        window.onload = async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const code = urlParams.get('code');
-
-            if (code) {
-                // We have a code, so exchange it for an access token
-                history.replaceState({}, document.title, window.location.pathname); // Clean up URL
-                const accessToken = await getAccessToken(code);
-                if (accessToken) {
-                    const user = await fetchGitHubUser(accessToken);
-                    displayUserInfo(user);
-                }
-            }
-        };
-    </script>
-</body>
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+  <script type="module" src="/src/index.jsx"></script>
 </html>

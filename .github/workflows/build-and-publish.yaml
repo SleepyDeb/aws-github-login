@@ -1,0 +1,47 @@
+# .github/workflows/react-build.yml
+
+name: React Build And Publish
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  # Triggers the workflow on pull request events targeted at the "main" branch
+  pull_request:
+    branches: [ "main" ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # 1. Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Sets up a specific version of Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # You can specify your desired Node.js version here
+          cache: 'npm'       # Caches npm dependencies for faster builds
+
+      # 3. Installs dependencies using npm ci for a clean, reliable install
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Runs the build script defined in your package.json
+      - name: Build React application
+        run: npm run build
+        
+      # 5. Publishes the build to GitHub Pages
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
