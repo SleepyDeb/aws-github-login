@@ -46,8 +46,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4. Runs the build script defined in your package.json
+      # 4. Runs the build script defined in your package.json with OAuth environment variables
       - name: Build React application
+        env:
+          VITE_OAUTH_AUTHORITY: ${{ secrets.OAUTH_AUTHORITY }}
+          VITE_OAUTH_CLIENT_ID: ${{ secrets.OAUTH_CLIENT_ID }}
+          VITE_OAUTH_SCOPE: ${{ secrets.OAUTH_SCOPE }}
         run: npm run build
 
       # 5. Publishes the build to GitHub Pages

@@ -73,6 +73,7 @@ export function AuthProvider({ children }) {
             updateAuthState({ isLoading: true, error: null });
 
             // Get configuration from environment variables
+            // Supports both VITE_ prefixed (for local development) and build-time injected variables
             const config = {
                 authority: import.meta.env.VITE_OAUTH_AUTHORITY || import.meta.env.OAUTH_AUTHORITY,
                 clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || import.meta.env.OAUTH_CLIENT_ID,
