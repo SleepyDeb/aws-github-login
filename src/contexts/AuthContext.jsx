@@ -78,7 +78,7 @@ export function AuthProvider({ children }) {
                 authority: import.meta.env.VITE_OAUTH_AUTHORITY || import.meta.env.OAUTH_AUTHORITY,
                 clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || import.meta.env.OAUTH_CLIENT_ID,
                 scope: import.meta.env.VITE_OAUTH_SCOPE || import.meta.env.OAUTH_SCOPE,
-                redirectUri: import.meta.env.VITE_REDIRECT_URI || window.location.origin
+                redirectUri: import.meta.env.VITE_REDIRECT_URI || window.location.href
             };
 
             // Validate required configuration
