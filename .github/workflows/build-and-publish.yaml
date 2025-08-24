@@ -46,21 +46,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4. Runs the build script defined in your package.json with OAuth environment variables
+      # 4. Log environment variables for debugging
+      - name: Debug environment variables
+        env:
+          VITE_OAUTH_AUTHORITY: ${{ secrets.OAUTH_AUTHORITY }}
+          VITE_OAUTH_CLIENT_ID: ${{ secrets.OAUTH_CLIENT_ID }}
+          VITE_OAUTH_SCOPE: ${{ secrets.OAUTH_SCOPE }}
+        run: |
+          echo "=== Environment Variables Debug ==="
+          echo "VITE_OAUTH_AUTHORITY is set: ${VITE_OAUTH_AUTHORITY:+YES}"
+          echo "VITE_OAUTH_CLIENT_ID is set: ${VITE_OAUTH_CLIENT_ID:+YES}"
+          echo "VITE_OAUTH_SCOPE is set: ${VITE_OAUTH_SCOPE:+YES}"
+          echo "VITE_OAUTH_AUTHORITY length: ${#VITE_OAUTH_AUTHORITY}"
+          echo "VITE_OAUTH_CLIENT_ID length: ${#VITE_OAUTH_CLIENT_ID}"
+          echo "VITE_OAUTH_SCOPE length: ${#VITE_OAUTH_SCOPE}"
+          echo "All VITE_ variables:"
+          env | grep ^VITE_ || echo "No VITE_ variables found"
+          echo "=================================="
+
+      # 5. Runs the build script defined in your package.json with OAuth environment variables
       - name: Build React application
         env:
           VITE_OAUTH_AUTHORITY: ${{ secrets.OAUTH_AUTHORITY }}
           VITE_OAUTH_CLIENT_ID: ${{ secrets.OAUTH_CLIENT_ID }}
           VITE_OAUTH_SCOPE: ${{ secrets.OAUTH_SCOPE }}
-        run: 
-          - echo "Building the React application..."
-          - echo "Using VITE_OAUTH_AUTHORITY: $VITE_OAUTH_AUTHORITY"
-          - echo "Using VITE_OAUTH_CLIENT_ID: $VITE_OAUTH_CLIENT_ID"
-          - echo "Using VITE_OAUTH_SCOPE: $VITE_OAUTH_SCOPE"
-          - npm run build
-          - ls -la dist  # List contents of the dist directory to verify build output
+        run: |
+          echo "=== Starting build process ==="
+          echo "Verifying environment variables are available to build:"
+          env | grep ^VITE_ || echo "No VITE_ variables found in build environment"
+          echo "Running npm run build..."
+          npm run build
+          echo "=== Build process completed ==="
 
-      # 5. Publishes the build to GitHub Pages
+      # 6. Publishes the build to GitHub Pages
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
