@@ -52,7 +52,13 @@ jobs:
           VITE_OAUTH_AUTHORITY: ${{ secrets.OAUTH_AUTHORITY }}
           VITE_OAUTH_CLIENT_ID: ${{ secrets.OAUTH_CLIENT_ID }}
           VITE_OAUTH_SCOPE: ${{ secrets.OAUTH_SCOPE }}
-        run: npm run build
+        run: 
+          - echo "Building the React application..."
+          - echo "Using VITE_OAUTH_AUTHORITY: $VITE_OAUTH_AUTHORITY"
+          - echo "Using VITE_OAUTH_CLIENT_ID: $VITE_OAUTH_CLIENT_ID"
+          - echo "Using VITE_OAUTH_SCOPE: $VITE_OAUTH_SCOPE"
+          - npm run build
+          - ls -la dist  # List contents of the dist directory to verify build output
 
       # 5. Publishes the build to GitHub Pages
       - name: Upload artifact
