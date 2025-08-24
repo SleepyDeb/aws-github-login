@@ -28,8 +28,7 @@ async function fetchOIDCConfiguration(authority) {
         const response = await fetch(discoveryUrl, {
             method: 'GET',
             headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
+                'Accept': 'application/json'
             }
         });
 
