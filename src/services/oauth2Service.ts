@@ -19,28 +19,31 @@ import {
     getSessionDebugInfo
 } from './sessionManager.js';
 
+import type { 
+    OAuthConfig, 
+    OIDCEndpoints, 
+    TokenResponse, 
+    UserInfo, 
+    AuthSession, 
+    AuthDebugInfo 
+} from '../types/auth.js';
+
 /**
  * OAuth2 Service class for handling authentication flows
  */
 export class OAuth2Service {
-    constructor() {
-        this.authority = null;
-        this.clientId = null;
-        this.scope = null;
-        this.redirectUri = null;
-        this.endpoints = null;
-        this.initialized = false;
-    }
+    private authority: string | null = null;
+    private clientId: string | null = null;
+    private scope: string | null = null;
+    private redirectUri: string | null = null;
+    private endpoints: OIDCEndpoints | null = null;
+    private initialized: boolean = false;
 
     /**
      * Initializes the OAuth2 service with configuration
-     * @param {Object} config - Configuration object
-     * @param {string} config.authority - OAuth2 authority URL
-     * @param {string} config.clientId - OAuth2 client ID
-     * @param {string} config.scope - OAuth2 scopes
-     * @param {string} [config.redirectUri] - Redirect URI (defaults to current origin)
+     * @param config - Configuration object
      */
-    async initialize(config) {
+    async initialize(config: OAuthConfig): Promise<OIDCEndpoints> {
         try {
             // Validate required configuration
             if (!config.authority || !config.clientId || !config.scope) {
@@ -68,15 +71,16 @@ export class OAuth2Service {
             return this.endpoints;
         } catch (error) {
             console.error('Failed to initialize OAuth2 service:', error);
-            throw new Error(`OAuth2 initialization failed: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`OAuth2 initialization failed: ${message}`);
         }
     }
 
     /**
      * Checks if the service is properly initialized
-     * @throws {Error} If service is not initialized
+     * @throws If service is not initialized
      */
-    ensureInitialized() {
+    private ensureInitialized(): void {
         if (!this.initialized) {
             throw new Error('OAuth2 service not initialized. Call initialize() first.');
         }
@@ -86,7 +90,7 @@ export class OAuth2Service {
      * Starts the OAuth2 authentication flow
      * Generates PKCE parameters and redirects to authorization endpoint
      */
-    async login() {
+    async login(): Promise<void> {
         this.ensureInitialized();
 
         try {
@@ -102,11 +106,11 @@ export class OAuth2Service {
             storeOAuthState(state);
 
             // Build authorization URL
-            const authUrl = new URL(this.endpoints.authorizationEndpoint);
-            authUrl.searchParams.append('client_id', this.clientId);
-            authUrl.searchParams.append('redirect_uri', this.redirectUri);
+            const authUrl = new URL(this.endpoints!.authorizationEndpoint);
+            authUrl.searchParams.append('client_id', this.clientId!);
+            authUrl.searchParams.append('redirect_uri', this.redirectUri!);
             authUrl.searchParams.append('response_type', 'code');
-            authUrl.searchParams.append('scope', this.scope);
+            authUrl.searchParams.append('scope', this.scope!);
             authUrl.searchParams.append('code_challenge', codeChallenge);
             authUrl.searchParams.append('code_challenge_method', 'S256');
             authUrl.searchParams.append('state', state);
@@ -117,18 +121,19 @@ export class OAuth2Service {
             window.location.href = authUrl.toString();
         } catch (error) {
             console.error('Failed to start login flow:', error);
-            throw new Error(`Login failed: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`Login failed: ${message}`);
         }
     }
 
     /**
      * Handles the OAuth2 callback after user authorization
      * Exchanges authorization code for tokens
-     * @param {string} code - Authorization code from callback
-     * @param {string} state - State parameter from callback
-     * @returns {Promise<Object>} User information and session data
+     * @param code - Authorization code from callback
+     * @param state - State parameter from callback
+     * @returns User information and session data
      */
-    async handleCallback(code, state) {
+    async handleCallback(code: string, state: string): Promise<{ user: UserInfo; session: AuthSession }> {
         this.ensureInitialized();
 
         try {
@@ -157,15 +162,22 @@ export class OAuth2Service {
             const expiresAt = Date.now() + (expiresIn * 1000);
 
             // Create and store session
-            const session = {
+            const session: AuthSession = {
                 accessToken: tokenResponse.access_token,
-                refreshToken: tokenResponse.refresh_token,
-                idToken: tokenResponse.id_token,
                 tokenType: tokenResponse.token_type || 'Bearer',
-                scope: tokenResponse.scope || this.scope,
+                scope: tokenResponse.scope || this.scope!,
                 expiresAt,
+                createdAt: Date.now(),
                 user: userInfo
             };
+
+            // Add optional properties only if they exist
+            if (tokenResponse.refresh_token) {
+                session.refreshToken = tokenResponse.refresh_token;
+            }
+            if (tokenResponse.id_token) {
+                session.idToken = tokenResponse.id_token;
+            }
 
             storeSession(session);
 
@@ -176,28 +188,29 @@ export class OAuth2Service {
             // Clean up any stored state on error
             retrievePKCEVerifier();
             retrieveOAuthState();
-            throw new Error(`Callback handling failed: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`Callback handling failed: ${message}`);
         }
     }
 
     /**
      * Exchanges authorization code for access tokens
-     * @param {string} code - Authorization code
-     * @param {string} codeVerifier - PKCE code verifier
-     * @returns {Promise<Object>} Token response object
+     * @param code - Authorization code
+     * @param codeVerifier - PKCE code verifier
+     * @returns Token response object
      */
-    async exchangeCodeForTokens(code, codeVerifier) {
+    private async exchangeCodeForTokens(code: string, codeVerifier: string): Promise<TokenResponse> {
         try {
             console.log('Exchanging authorization code for tokens...');
 
             const params = new URLSearchParams();
-            params.append('client_id', this.clientId);
+            params.append('client_id', this.clientId!);
             params.append('code', code);
             params.append('code_verifier', codeVerifier);
-            params.append('redirect_uri', this.redirectUri);
+            params.append('redirect_uri', this.redirectUri!);
             params.append('grant_type', 'authorization_code');
 
-            const response = await fetch(this.endpoints.tokenEndpoint, {
+            const response = await fetch(this.endpoints!.tokenEndpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -211,7 +224,7 @@ export class OAuth2Service {
                 throw new Error(`Token exchange failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
-            const tokenData = await response.json();
+            const tokenData = await response.json() as TokenResponse;
 
             if (tokenData.error) {
                 throw new Error(`Token error: ${tokenData.error_description || tokenData.error}`);
@@ -231,19 +244,19 @@ export class OAuth2Service {
 
     /**
      * Fetches user information from the userinfo endpoint
-     * @param {string} accessToken - Access token
-     * @returns {Promise<Object>} User information object
+     * @param accessToken - Access token
+     * @returns User information object
      */
-    async fetchUserInfo(accessToken) {
+    private async fetchUserInfo(accessToken: string): Promise<UserInfo> {
         try {
             console.log('Fetching user information...');
 
-            if (!this.endpoints.userinfoEndpoint) {
+            if (!this.endpoints!.userinfoEndpoint) {
                 console.warn('No userinfo endpoint available, returning minimal user data');
                 return { sub: 'unknown', authenticated: true };
             }
 
-            const response = await fetch(this.endpoints.userinfoEndpoint, {
+            const response = await fetch(this.endpoints!.userinfoEndpoint, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Accept': 'application/json'
@@ -254,22 +267,23 @@ export class OAuth2Service {
                 throw new Error(`Userinfo fetch failed: ${response.status} ${response.statusText}`);
             }
 
-            const userInfo = await response.json();
+            const userInfo = await response.json() as UserInfo;
             console.log('User information fetched successfully');
             return userInfo;
         } catch (error) {
             console.error('Failed to fetch user info:', error);
+            const message = error instanceof Error ? error.message : String(error);
             // Return minimal user data if userinfo fetch fails
-            return { sub: 'unknown', authenticated: true, error: error.message };
+            return { sub: 'unknown', authenticated: true, error: message };
         }
     }
 
     /**
      * Logs out the current user
      * Clears session data and optionally redirects to logout endpoint
-     * @param {boolean} [redirectToProvider=false] - Whether to redirect to provider logout
+     * @param redirectToProvider - Whether to redirect to provider logout
      */
-    async logout(redirectToProvider = false) {
+    async logout(redirectToProvider: boolean = false): Promise<void> {
         try {
             console.log('Logging out user...');
 
@@ -282,7 +296,7 @@ export class OAuth2Service {
                 if (session?.idToken) {
                     logoutUrl.searchParams.append('id_token_hint', session.idToken);
                 }
-                logoutUrl.searchParams.append('post_logout_redirect_uri', this.redirectUri);
+                logoutUrl.searchParams.append('post_logout_redirect_uri', this.redirectUri!);
                 
                 window.location.href = logoutUrl.toString();
             } else {
@@ -299,48 +313,63 @@ export class OAuth2Service {
 
     /**
      * Gets the current authentication status
-     * @returns {Object} Authentication status object
+     * @returns Authentication status object
      */
-    getAuthStatus() {
+    getAuthStatus(): AuthDebugInfo {
+        const session = getSession();
+        const debugInfo = getSessionDebugInfo();
+        
         return {
+            session,
             isAuthenticated: isSessionValid(),
-            session: getSession(),
-            debugInfo: getSessionDebugInfo()
+            debugInfo: debugInfo.hasSession ? {
+                timeRemaining: debugInfo.timeRemaining || 0,
+                timeRemainingFormatted: debugInfo.timeRemainingFormatted || '0s'
+            } : null
         };
     }
 
     /**
      * Checks if user is currently authenticated
-     * @returns {boolean} True if authenticated and session is valid
+     * @returns True if authenticated and session is valid
      */
-    isAuthenticated() {
+    isAuthenticated(): boolean {
         return isSessionValid();
     }
 
     /**
      * Gets the current user information
-     * @returns {Object|null} User information or null if not authenticated
+     * @returns User information or null if not authenticated
      */
-    getCurrentUser() {
+    getCurrentUser(): UserInfo | null {
         const session = getSession();
         return session?.user || null;
     }
 
     /**
      * Gets the current access token
-     * @returns {string|null} Access token or null if not authenticated
+     * @returns Access token or null if not authenticated
      */
-    getAccessToken() {
+    getAccessToken(): string | null {
         const session = getSession();
         return session?.accessToken || null;
     }
 
     /**
+     * Gets the current ID token (JWT)
+     * @returns ID token or null if not authenticated or not available
+     */
+    getIdToken(): string | null {
+        const session = getSession();
+        return session?.idToken || null;
+    }
+
+    /**
      * Handles the page load to check for OAuth callback
      * Should be called on app initialization
-     * @returns {Promise<Object|null>} User data if callback was handled, null otherwise
+     * @returns User data if callback was handled, null otherwise
      */
-    async handlePageLoad() {
+    async handlePageLoad(): Promise<{ user: UserInfo; session: AuthSession } | null> {
         try {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');

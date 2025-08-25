@@ -4,34 +4,23 @@
  * Manages tokens, user information, and PKCE verification codes
  */
 
+import type { AuthSession, UserInfo, SessionDebugInfo } from '../types/auth.js';
+
 const SESSION_KEY = 'auth-session';
 const PKCE_VERIFIER_KEY = 'pkce-verifier';
 const STATE_KEY = 'oauth-state';
 
 /**
- * Represents an authentication session
- * @typedef {Object} AuthSession
- * @property {string} accessToken - The OAuth2 access token
- * @property {string} [refreshToken] - The OAuth2 refresh token (if available)
- * @property {string} [idToken] - The OpenID Connect ID token (if available)
- * @property {number} expiresAt - Timestamp when the access token expires
- * @property {Object} user - User information from userinfo endpoint
- * @property {string} tokenType - Token type (usually 'Bearer')
- * @property {string} scope - Granted scopes
- * @property {number} createdAt - Timestamp when session was created
- */
-
-/**
  * Stores the authentication session in localStorage
- * @param {AuthSession} session - The authentication session to store
+ * @param session - The authentication session to store
  */
-export function storeSession(session) {
+export function storeSession(session: AuthSession): void {
     try {
         if (!session || !session.accessToken) {
             throw new Error('Invalid session: access token is required');
         }
 
-        const sessionData = {
+        const sessionData: AuthSession = {
             ...session,
             createdAt: session.createdAt || Date.now()
         };
@@ -40,22 +29,23 @@ export function storeSession(session) {
         console.log('Authentication session stored successfully');
     } catch (error) {
         console.error('Failed to store authentication session:', error);
-        throw new Error(`Session storage failed: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Session storage failed: ${message}`);
     }
 }
 
 /**
  * Retrieves the authentication session from localStorage
- * @returns {AuthSession|null} The stored session or null if not found/invalid
+ * @returns The stored session or null if not found/invalid
  */
-export function getSession() {
+export function getSession(): AuthSession | null {
     try {
         const sessionData = localStorage.getItem(SESSION_KEY);
         if (!sessionData) {
             return null;
         }
 
-        const session = JSON.parse(sessionData);
+        const session = JSON.parse(sessionData) as AuthSession;
         
         // Validate session structure
         if (!session.accessToken || !session.expiresAt) {
@@ -74,9 +64,9 @@ export function getSession() {
 
 /**
  * Checks if the current session is valid and not expired
- * @returns {boolean} True if session is valid and not expired
+ * @returns True if session is valid and not expired
  */
-export function isSessionValid() {
+export function isSessionValid(): boolean {
     const session = getSession();
     if (!session) {
         return false;
@@ -96,9 +86,9 @@ export function isSessionValid() {
 
 /**
  * Gets the time remaining until session expires
- * @returns {number} Milliseconds until expiration, or 0 if expired/invalid
+ * @returns Milliseconds until expiration, or 0 if expired/invalid
  */
-export function getSessionTimeRemaining() {
+export function getSessionTimeRemaining(): number {
     const session = getSession();
     if (!session) {
         return 0;
@@ -111,7 +101,7 @@ export function getSessionTimeRemaining() {
 /**
  * Clears the authentication session from localStorage
  */
-export function clearSession() {
+export function clearSession(): void {
     try {
         localStorage.removeItem(SESSION_KEY);
         console.log('Authentication session cleared');
@@ -122,9 +112,9 @@ export function clearSession() {
 
 /**
  * Updates the user information in the current session
- * @param {Object} userInfo - Updated user information
+ * @param userInfo - Updated user information
  */
-export function updateSessionUser(userInfo) {
+export function updateSessionUser(userInfo: UserInfo): void {
     const session = getSession();
     if (!session) {
         throw new Error('No active session to update');
@@ -136,9 +126,9 @@ export function updateSessionUser(userInfo) {
 
 /**
  * Stores the PKCE code verifier for the current OAuth flow
- * @param {string} verifier - The PKCE code verifier
+ * @param verifier - The PKCE code verifier
  */
-export function storePKCEVerifier(verifier) {
+export function storePKCEVerifier(verifier: string): void {
     try {
         if (!verifier) {
             throw new Error('PKCE verifier is required');
@@ -154,9 +144,9 @@ export function storePKCEVerifier(verifier) {
 
 /**
  * Retrieves and removes the PKCE code verifier
- * @returns {string|null} The stored verifier or null if not found
+ * @returns The stored verifier or null if not found
  */
-export function retrievePKCEVerifier() {
+export function retrievePKCEVerifier(): string | null {
     try {
         const verifier = localStorage.getItem(PKCE_VERIFIER_KEY);
         if (verifier) {
@@ -172,9 +162,9 @@ export function retrievePKCEVerifier() {
 
 /**
  * Stores the OAuth state parameter for CSRF protection
- * @param {string} state - The OAuth state parameter
+ * @param state - The OAuth state parameter
  */
-export function storeOAuthState(state) {
+export function storeOAuthState(state: string): void {
     try {
         if (!state) {
             throw new Error('OAuth state is required');
@@ -190,9 +180,9 @@ export function storeOAuthState(state) {
 
 /**
  * Retrieves and removes the OAuth state parameter
- * @returns {string|null} The stored state or null if not found
+ * @returns The stored state or null if not found
  */
-export function retrieveOAuthState() {
+export function retrieveOAuthState(): string | null {
     try {
         const state = localStorage.getItem(STATE_KEY);
         if (state) {
@@ -210,7 +200,7 @@ export function retrieveOAuthState() {
  * Clears all authentication-related data from localStorage
  * Use this for complete logout or when switching between different OAuth providers
  */
-export function clearAllAuthData() {
+export function clearAllAuthData(): void {
     try {
         localStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(PKCE_VERIFIER_KEY);
@@ -234,9 +224,9 @@ export function clearAllAuthData() {
 
 /**
  * Gets debug information about the current session
- * @returns {Object} Debug information object
+ * @returns Debug information object
  */
-export function getSessionDebugInfo() {
+export function getSessionDebugInfo(): SessionDebugInfo {
     const session = getSession();
     if (!session) {
         return { hasSession: false };
@@ -246,7 +236,7 @@ export function getSessionDebugInfo() {
     const timeRemaining = getSessionTimeRemaining();
     const isExpired = timeRemaining === 0;
 
-    return {
+    const debugInfo: SessionDebugInfo = {
         hasSession: true,
         isExpired,
         timeRemaining,
@@ -257,17 +247,22 @@ export function getSessionDebugInfo() {
         scope: session.scope,
         hasRefreshToken: !!session.refreshToken,
         hasIdToken: !!session.idToken,
-        userId: session.user?.sub || session.user?.id,
-        userEmail: session.user?.email
+        userId: session.user.sub
     };
+
+    if (session.user.email) {
+        debugInfo.userEmail = session.user.email;
+    }
+
+    return debugInfo;
 }
 
 /**
  * Formats milliseconds into a human-readable time string
- * @param {number} ms - Milliseconds
- * @returns {string} Formatted time string
+ * @param ms - Milliseconds
+ * @returns Formatted time string
  */
-function formatTime(ms) {
+function formatTime(ms: number): string {
     if (ms <= 0) return '0s';
     
     const seconds = Math.floor(ms / 1000);

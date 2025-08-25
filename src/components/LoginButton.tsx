@@ -3,18 +3,29 @@
  * Provides a button to initiate OAuth2 authentication flow
  */
 
-import React from 'react';
+import React, { MouseEvent, ButtonHTMLAttributes } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
 
 /**
+ * Login Button Component Props
+ */
+interface LoginButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
+  /** Additional CSS classes */
+  className?: string;
+  /** Button text (default: "Login") */
+  text?: string;
+  /** Whether button is disabled */
+  disabled?: boolean;
+  /** Additional click handler */
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<void>;
+  /** Inline styles */
+  style?: React.CSSProperties;
+}
+
+/**
  * Login Button Component
- * @param {Object} props - Component props
- * @param {string} [props.className] - Additional CSS classes
- * @param {string} [props.text] - Button text (default: "Login")
- * @param {boolean} [props.disabled] - Whether button is disabled
- * @param {Function} [props.onClick] - Additional click handler
- * @param {Object} [props.style] - Inline styles
- * @returns {React.Component} Login button component
+ * @param props - Component props
+ * @returns Login button component
  */
 export function LoginButton({ 
     className = '', 
@@ -23,10 +34,10 @@ export function LoginButton({
     onClick,
     style = {},
     ...props 
-}) {
+}: LoginButtonProps): JSX.Element | null {
     const { login, isLoading, isAuthenticated, error } = useAuth();
 
-    const handleClick = async (event) => {
+    const handleClick = async (event: MouseEvent<HTMLButtonElement>): Promise<void> => {
         try {
             // Call additional click handler if provided
             if (onClick) {
@@ -47,7 +58,7 @@ export function LoginButton({
 
     const isDisabled = disabled || isLoading;
 
-    const defaultStyle = {
+    const defaultStyle: React.CSSProperties = {
         backgroundColor: '#24292e',
         color: 'white',
         border: 'none',
@@ -73,12 +84,12 @@ export function LoginButton({
             style={defaultStyle}
             onMouseEnter={(e) => {
                 if (!isDisabled) {
-                    e.target.style.backgroundColor = hoverStyle.backgroundColor;
+                    (e.target as HTMLButtonElement).style.backgroundColor = hoverStyle.backgroundColor;
                 }
             }}
             onMouseLeave={(e) => {
                 if (!isDisabled) {
-                    e.target.style.backgroundColor = defaultStyle.backgroundColor;
+                    (e.target as HTMLButtonElement).style.backgroundColor = defaultStyle.backgroundColor || '#24292e';
                 }
             }}
             title={error ? `Login error: ${error}` : 'Sign in with OAuth provider'}
@@ -93,7 +104,7 @@ export function LoginButton({
  * Compact Login Button Component
  * Smaller version for navigation bars or compact layouts
  */
-export function CompactLoginButton(props) {
+export function CompactLoginButton(props: LoginButtonProps): JSX.Element | null {
     return (
         <LoginButton
             {...props}
@@ -110,7 +121,7 @@ export function CompactLoginButton(props) {
  * Large Login Button Component
  * Bigger version for landing pages or prominent placement
  */
-export function LargeLoginButton(props) {
+export function LargeLoginButton(props: LoginButtonProps): JSX.Element | null {
     return (
         <LoginButton
             {...props}

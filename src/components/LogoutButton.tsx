@@ -3,21 +3,35 @@
  * Provides a button to sign out and clear authentication session
  */
 
-import React, { useState } from 'react';
+import React, { useState, MouseEvent, ButtonHTMLAttributes } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
 
 /**
+ * Logout Button Component Props
+ */
+interface LogoutButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
+  /** Additional CSS classes */
+  className?: string;
+  /** Button text (default: "Logout") */
+  text?: string;
+  /** Whether button is disabled */
+  disabled?: boolean;
+  /** Whether to redirect to provider logout */
+  redirectToProvider?: boolean;
+  /** Whether to show confirmation dialog */
+  confirmLogout?: boolean;
+  /** Additional click handler */
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<void> | boolean | Promise<boolean>;
+  /** Callback after successful logout */
+  onLogoutComplete?: () => void;
+  /** Inline styles */
+  style?: React.CSSProperties;
+}
+
+/**
  * Logout Button Component
- * @param {Object} props - Component props
- * @param {string} [props.className] - Additional CSS classes
- * @param {string} [props.text] - Button text (default: "Logout")
- * @param {boolean} [props.disabled] - Whether button is disabled
- * @param {boolean} [props.redirectToProvider] - Whether to redirect to provider logout
- * @param {boolean} [props.confirmLogout] - Whether to show confirmation dialog
- * @param {Function} [props.onClick] - Additional click handler
- * @param {Function} [props.onLogoutComplete] - Callback after successful logout
- * @param {Object} [props.style] - Inline styles
- * @returns {React.Component} Logout button component
+ * @param props - Component props
+ * @returns Logout button component
  */
 export function LogoutButton({ 
     className = '', 
@@ -29,11 +43,11 @@ export function LogoutButton({
     onLogoutComplete,
     style = {},
     ...props 
-}) {
+}: LogoutButtonProps): JSX.Element | null {
     const { logout, isLoading, isAuthenticated, user } = useAuth();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-    const handleClick = async (event) => {
+    const handleClick = async (event: MouseEvent<HTMLButtonElement>): Promise<void> => {
         try {
             // Call additional click handler if provided
             if (onClick) {
@@ -77,7 +91,7 @@ export function LogoutButton({
 
     const isDisabled = disabled || isLoading || isLoggingOut;
 
-    const defaultStyle = {
+    const defaultStyle: React.CSSProperties = {
         backgroundColor: '#dc3545',
         color: 'white',
         border: 'none',
@@ -104,12 +118,12 @@ export function LogoutButton({
             style={defaultStyle}
             onMouseEnter={(e) => {
                 if (!isDisabled) {
-                    e.target.style.backgroundColor = hoverStyle.backgroundColor;
+                    (e.target as HTMLButtonElement).style.backgroundColor = hoverStyle.backgroundColor;
                 }
             }}
             onMouseLeave={(e) => {
                 if (!isDisabled) {
-                    e.target.style.backgroundColor = defaultStyle.backgroundColor;
+                    (e.target as HTMLButtonElement).style.backgroundColor = defaultStyle.backgroundColor || '#dc3545';
                 }
             }}
             title={`Sign out ${user?.name || user?.email || 'current user'}`}
@@ -124,7 +138,7 @@ export function LogoutButton({
  * Compact Logout Button Component
  * Smaller version for navigation bars or compact layouts
  */
-export function CompactLogoutButton(props) {
+export function CompactLogoutButton(props: LogoutButtonProps): JSX.Element | null {
     return (
         <LogoutButton
             {...props}
@@ -141,7 +155,7 @@ export function CompactLogoutButton(props) {
  * Icon-only Logout Button Component
  * Shows only an icon for very compact layouts
  */
-export function IconLogoutButton(props) {
+export function IconLogoutButton(props: LogoutButtonProps): JSX.Element | null {
     return (
         <LogoutButton
             {...props}
@@ -161,7 +175,7 @@ export function IconLogoutButton(props) {
  * Safe Logout Button Component
  * Always shows confirmation dialog before logout
  */
-export function SafeLogoutButton(props) {
+export function SafeLogoutButton(props: LogoutButtonProps): JSX.Element | null {
     return (
         <LogoutButton
             {...props}
@@ -175,7 +189,7 @@ export function SafeLogoutButton(props) {
  * Provider Logout Button Component
  * Always redirects to OAuth provider logout endpoint
  */
-export function ProviderLogoutButton(props) {
+export function ProviderLogoutButton(props: LogoutButtonProps): JSX.Element | null {
     return (
         <LogoutButton
             {...props}
@@ -194,8 +208,8 @@ export function LogoutLink({
     className = '', 
     style = {},
     ...props 
-}) {
-    const linkStyle = {
+}: LogoutButtonProps): JSX.Element | null {
+    const linkStyle: React.CSSProperties = {
         color: '#dc3545',
         textDecoration: 'underline',
         cursor: 'pointer',
@@ -219,7 +233,7 @@ export function LogoutLink({
  * User Menu Logout Button Component
  * Designed for dropdown menus with user info
  */
-export function UserMenuLogoutButton(props) {
+export function UserMenuLogoutButton(props: LogoutButtonProps): JSX.Element {
     const { user } = useAuth();
     
     return (

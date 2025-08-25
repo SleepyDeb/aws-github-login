@@ -6,13 +6,13 @@
 /**
  * Generates a cryptographically secure random string for the code verifier
  * Uses base64url encoding as specified in RFC 7636
- * @returns {string} A code verifier string (43-128 characters)
+ * @returns A code verifier string (43-128 characters)
  */
-export function generateCodeVerifier() {
+export function generateCodeVerifier(): string {
     const randomBytes = new Uint8Array(32);
     window.crypto.getRandomValues(randomBytes);
     
-    return btoa(String.fromCharCode.apply(null, randomBytes))
+    return btoa(String.fromCharCode.apply(null, Array.from(randomBytes)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
@@ -21,15 +21,15 @@ export function generateCodeVerifier() {
 /**
  * Generates a code challenge from the code verifier using SHA-256
  * Uses base64url encoding as specified in RFC 7636
- * @param {string} verifier - The code verifier string
- * @returns {Promise<string>} A promise that resolves to the code challenge
+ * @param verifier - The code verifier string
+ * @returns A promise that resolves to the code challenge
  */
-export async function generateCodeChallenge(verifier) {
+export async function generateCodeChallenge(verifier: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(verifier);
     const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
     
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(hashBuffer)))
+    return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(hashBuffer))))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
@@ -37,10 +37,10 @@ export async function generateCodeChallenge(verifier) {
 
 /**
  * Validates that a code verifier meets RFC 7636 requirements
- * @param {string} verifier - The code verifier to validate
- * @returns {boolean} True if valid, false otherwise
+ * @param verifier - The code verifier to validate
+ * @returns True if valid, false otherwise
  */
-export function isValidCodeVerifier(verifier) {
+export function isValidCodeVerifier(verifier: string): boolean {
     if (!verifier || typeof verifier !== 'string') {
         return false;
     }
@@ -58,13 +58,13 @@ export function isValidCodeVerifier(verifier) {
 /**
  * Generates a cryptographically secure state parameter for OAuth2 requests
  * Used to prevent CSRF attacks
- * @returns {string} A random state string
+ * @returns A random state string
  */
-export function generateState() {
+export function generateState(): string {
     const randomBytes = new Uint8Array(16);
     window.crypto.getRandomValues(randomBytes);
     
-    return btoa(String.fromCharCode.apply(null, randomBytes))
+    return btoa(String.fromCharCode.apply(null, Array.from(randomBytes)))
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');

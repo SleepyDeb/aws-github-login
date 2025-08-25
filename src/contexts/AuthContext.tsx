@@ -4,29 +4,34 @@
  * Wraps the OAuth2Service for seamless React integration
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { oauth2Service } from '../services/oauth2Service.js';
+import type { 
+    AuthState, 
+    AuthContextValue, 
+    UserInfo, 
+    AuthDebugInfo,
+    OAuthConfig,
+    AuthEnvironmentConfig 
+} from '../types/auth.js';
 
 // Create the authentication context
-const AuthContext = createContext(null);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * Authentication state object
- * @typedef {Object} AuthState
- * @property {boolean} isAuthenticated - Whether user is authenticated
- * @property {Object|null} user - Current user information
- * @property {boolean} isLoading - Whether auth operation is in progress
- * @property {string|null} error - Current error message
- * @property {boolean} isInitialized - Whether auth service is initialized
+ * Authentication Context Provider props
  */
+interface AuthProviderProps {
+    children: ReactNode;
+}
 
 /**
  * Authentication Context Provider
  * Manages authentication state and provides auth methods to child components
  */
-export function AuthProvider({ children }) {
+export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     // Authentication state
-    const [authState, setAuthState] = useState({
+    const [authState, setAuthState] = useState<AuthState>({
         isAuthenticated: false,
         user: null,
         isLoading: true,
@@ -36,9 +41,9 @@ export function AuthProvider({ children }) {
 
     /**
      * Updates the authentication state
-     * @param {Partial<AuthState>} updates - State updates to apply
+     * @param updates - State updates to apply
      */
-    const updateAuthState = useCallback((updates) => {
+    const updateAuthState = useCallback((updates: Partial<AuthState>) => {
         setAuthState(prevState => ({
             ...prevState,
             ...updates
@@ -47,9 +52,9 @@ export function AuthProvider({ children }) {
 
     /**
      * Sets error state and logs it
-     * @param {string|Error} error - Error message or error object
+     * @param error - Error message or error object
      */
-    const setError = useCallback((error) => {
+    const setError = useCallback((error: string | Error) => {
         const errorMessage = error instanceof Error ? error.message : error;
         console.error('Auth error:', errorMessage);
         updateAuthState({ 
@@ -74,11 +79,12 @@ export function AuthProvider({ children }) {
 
             // Get configuration from environment variables
             // Supports both VITE_ prefixed (for local development) and build-time injected variables
-            const config = {
-                authority: import.meta.env.VITE_OAUTH_AUTHORITY || import.meta.env.OAUTH_AUTHORITY,
-                clientId: import.meta.env.VITE_OAUTH_CLIENT_ID || import.meta.env.OAUTH_CLIENT_ID,
-                scope: import.meta.env.VITE_OAUTH_SCOPE || import.meta.env.OAUTH_SCOPE,
-                redirectUri: import.meta.env.VITE_REDIRECT_URI || window.location.href
+            const env = import.meta.env;
+            const config: OAuthConfig = {
+                authority: env.VITE_OAUTH_AUTHORITY || env.OAUTH_AUTHORITY || '',
+                clientId: env.VITE_OAUTH_CLIENT_ID || env.OAUTH_CLIENT_ID || '',
+                scope: env.VITE_OAUTH_SCOPE || env.OAUTH_SCOPE || '',
+                redirectUri: env.VITE_REDIRECT_URI || window.location.href
             };
 
             // Validate required configuration
@@ -104,7 +110,7 @@ export function AuthProvider({ children }) {
             console.log('Auth service initialized successfully');
         } catch (error) {
             console.error('Failed to initialize auth service:', error);
-            setError(error);
+            setError(error instanceof Error ? error : String(error));
         }
     }, [updateAuthState, setError]);
 
@@ -157,7 +163,7 @@ export function AuthProvider({ children }) {
             }
         } catch (error) {
             console.error('Failed to handle page load:', error);
-            setError(error);
+            setError(error instanceof Error ? error : String(error));
         }
     }, [updateAuthState, checkAuthStatus, setError]);
 
@@ -175,15 +181,15 @@ export function AuthProvider({ children }) {
             // Note: This won't execute as login() redirects the page
         } catch (error) {
             console.error('Login failed:', error);
-            setError(error);
+            setError(error instanceof Error ? error : String(error));
         }
     }, [clearError, updateAuthState, setError]);
 
     /**
      * Logs out the current user
-     * @param {boolean} redirectToProvider - Whether to redirect to provider logout
+     * @param redirectToProvider - Whether to redirect to provider logout
      */
-    const logout = useCallback(async (redirectToProvider = false) => {
+    const logout = useCallback(async (redirectToProvider: boolean = false) => {
         try {
             clearError();
             updateAuthState({ isLoading: true });
@@ -199,23 +205,31 @@ export function AuthProvider({ children }) {
             });
         } catch (error) {
             console.error('Logout failed:', error);
-            setError(error);
+            setError(error instanceof Error ? error : String(error));
         }
     }, [clearError, updateAuthState, setError]);
 
     /**
      * Gets the current access token
-     * @returns {string|null} Access token or null if not authenticated
+     * @returns Access token or null if not authenticated
      */
-    const getAccessToken = useCallback(() => {
+    const getAccessToken = useCallback((): string | null => {
         return oauth2Service.getAccessToken();
     }, []);
 
     /**
-     * Gets debug information about the current session
-     * @returns {Object} Debug information
+     * Gets the current ID token (JWT)
+     * @returns ID token or null if not authenticated
      */
-    const getDebugInfo = useCallback(() => {
+    const getIdToken = useCallback((): string | null => {
+        return oauth2Service.getIdToken();
+    }, []);
+
+    /**
+     * Gets debug information about the current session
+     * @returns Debug information
+     */
+    const getDebugInfo = useCallback((): AuthDebugInfo => {
         return oauth2Service.getAuthStatus();
     }, []);
 
@@ -239,7 +253,7 @@ export function AuthProvider({ children }) {
                 }
             } catch (error) {
                 if (mounted) {
-                    setError(error);
+                    setError(error instanceof Error ? error : String(error));
                 }
             }
         };
@@ -252,7 +266,7 @@ export function AuthProvider({ children }) {
     }, [initializeAuth, handlePageLoad, setError]);
 
     // Create context value
-    const contextValue = {
+    const contextValue: AuthContextValue = {
         // Auth state
         ...authState,
         
@@ -264,6 +278,7 @@ export function AuthProvider({ children }) {
         
         // Utility methods
         getAccessToken,
+        getIdToken,
         getDebugInfo
     };
 
@@ -277,9 +292,9 @@ export function AuthProvider({ children }) {
 /**
  * Hook to access authentication context
  * Must be used within an AuthProvider
- * @returns {Object} Authentication context value
+ * @returns Authentication context value
  */
-export function useAuthContext() {
+export function useAuthContext(): AuthContextValue {
     const context = useContext(AuthContext);
     
     if (!context) {
@@ -291,11 +306,11 @@ export function useAuthContext() {
 
 /**
  * HOC to provide authentication context to components
- * @param {React.Component} Component - Component to wrap
- * @returns {React.Component} Wrapped component with auth context
+ * @param Component - Component to wrap
+ * @returns Wrapped component with auth context
  */
-export function withAuth(Component) {
-    return function WrappedComponent(props) {
+export function withAuth<P extends object>(Component: React.ComponentType<P>) {
+    return function WrappedComponent(props: P): JSX.Element {
         return (
             <AuthProvider>
                 <Component {...props} />

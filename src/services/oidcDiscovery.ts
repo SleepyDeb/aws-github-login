@@ -4,16 +4,18 @@
  * Provides caching mechanism using localStorage for performance
  */
 
+import type { OIDCConfiguration, OIDCEndpoints, OIDCCacheEntry, CacheInfo } from '../types/auth.js';
+
 const CACHE_KEY = 'oidc-manifest';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 /**
  * Fetches the OpenID Connect configuration from the well-known endpoint
- * @param {string} authority - The OAuth2 authority URL
- * @returns {Promise<Object>} The OIDC configuration object
- * @throws {Error} If the discovery fails or configuration is invalid
+ * @param authority - The OAuth2 authority URL
+ * @returns The OIDC configuration object
+ * @throws If the discovery fails or configuration is invalid
  */
-async function fetchOIDCConfiguration(authority) {
+async function fetchOIDCConfiguration(authority: string): Promise<OIDCConfiguration> {
     if (!authority) {
         throw new Error('OAuth authority is required for OIDC discovery');
     }
@@ -36,7 +38,7 @@ async function fetchOIDCConfiguration(authority) {
             throw new Error(`Failed to fetch OIDC configuration: ${response.status} ${response.statusText}`);
         }
 
-        const config = await response.json();
+        const config = await response.json() as OIDCConfiguration;
         
         // Validate required endpoints exist
         validateOIDCConfiguration(config);
@@ -44,17 +46,18 @@ async function fetchOIDCConfiguration(authority) {
         return config;
     } catch (error) {
         console.error('OIDC Discovery failed:', error);
-        throw new Error(`OIDC discovery failed: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`OIDC discovery failed: ${message}`);
     }
 }
 
 /**
  * Validates that the OIDC configuration contains required endpoints
- * @param {Object} config - The OIDC configuration object
- * @throws {Error} If required endpoints are missing
+ * @param config - The OIDC configuration object
+ * @throws If required endpoints are missing
  */
-function validateOIDCConfiguration(config) {
-    const requiredEndpoints = [
+function validateOIDCConfiguration(config: OIDCConfiguration): void {
+    const requiredEndpoints: (keyof OIDCConfiguration)[] = [
         'authorization_endpoint',
         'token_endpoint'
     ];
@@ -76,17 +79,17 @@ function validateOIDCConfiguration(config) {
 
 /**
  * Gets cached OIDC configuration from localStorage
- * @param {string} authority - The OAuth2 authority URL
- * @returns {Object|null} Cached configuration or null if not found/expired
+ * @param authority - The OAuth2 authority URL
+ * @returns Cached configuration or null if not found/expired
  */
-function getCachedConfiguration(authority) {
+function getCachedConfiguration(authority: string): OIDCConfiguration | null {
     try {
         const cached = localStorage.getItem(`${CACHE_KEY}-${btoa(authority)}`);
         if (!cached) {
             return null;
         }
 
-        const { config, timestamp } = JSON.parse(cached);
+        const { config, timestamp }: OIDCCacheEntry = JSON.parse(cached);
         const now = Date.now();
 
         // Check if cache is still valid
@@ -106,12 +109,12 @@ function getCachedConfiguration(authority) {
 
 /**
  * Caches OIDC configuration in localStorage
- * @param {string} authority - The OAuth2 authority URL
- * @param {Object} config - The OIDC configuration to cache
+ * @param authority - The OAuth2 authority URL
+ * @param config - The OIDC configuration to cache
  */
-function setCachedConfiguration(authority, config) {
+function setCachedConfiguration(authority: string, config: OIDCConfiguration): void {
     try {
-        const cacheData = {
+        const cacheData: OIDCCacheEntry = {
             config,
             timestamp: Date.now()
         };
@@ -127,10 +130,10 @@ function setCachedConfiguration(authority, config) {
 /**
  * Discovers OAuth2/OIDC endpoints for the given authority
  * Uses caching to improve performance and reduce network requests
- * @param {string} authority - The OAuth2 authority URL
- * @returns {Promise<Object>} Object containing discovered endpoints
+ * @param authority - The OAuth2 authority URL
+ * @returns Object containing discovered endpoints
  */
-export async function discoverOIDCEndpoints(authority) {
+export async function discoverOIDCEndpoints(authority: string): Promise<OIDCEndpoints> {
     if (!authority) {
         throw new Error('OAuth authority is required');
     }
@@ -145,22 +148,33 @@ export async function discoverOIDCEndpoints(authority) {
     }
 
     // Extract and return the endpoints we need
-    return {
+    const endpoints: OIDCEndpoints = {
         authorizationEndpoint: config.authorization_endpoint,
         tokenEndpoint: config.token_endpoint,
-        userinfoEndpoint: config.userinfo_endpoint,
-        issuer: config.issuer,
         supportedScopes: config.scopes_supported || [],
         supportedResponseTypes: config.response_types_supported || [],
         supportedCodeChallengeMethods: config.code_challenge_methods_supported || []
     };
+
+    // Add optional properties only if they exist
+    if (config.userinfo_endpoint) {
+        endpoints.userinfoEndpoint = config.userinfo_endpoint;
+    }
+    if (config.issuer) {
+        endpoints.issuer = config.issuer;
+    }
+    if (config.end_session_endpoint) {
+        endpoints.endSessionEndpoint = config.end_session_endpoint;
+    }
+
+    return endpoints;
 }
 
 /**
  * Clears all cached OIDC configurations
  * Useful for debugging or when switching between different authorities
  */
-export function clearOIDCCache() {
+export function clearOIDCCache(): void {
     try {
         const keys = Object.keys(localStorage);
         const oidcKeys = keys.filter(key => key.startsWith(CACHE_KEY));
@@ -174,16 +188,16 @@ export function clearOIDCCache() {
 
 /**
  * Gets information about cached configurations (for debugging)
- * @returns {Array} Array of cached configuration info
+ * @returns Array of cached configuration info
  */
-export function getCacheInfo() {
+export function getCacheInfo(): CacheInfo[] {
     try {
         const keys = Object.keys(localStorage);
         const oidcKeys = keys.filter(key => key.startsWith(CACHE_KEY));
         
         return oidcKeys.map(key => {
             try {
-                const data = JSON.parse(localStorage.getItem(key));
+                const data = JSON.parse(localStorage.getItem(key) || '{}') as OIDCCacheEntry;
                 const authority = atob(key.replace(`${CACHE_KEY}-`, ''));
                 const age = Date.now() - data.timestamp;
                 const expired = age > CACHE_DURATION;
@@ -195,7 +209,13 @@ export function getCacheInfo() {
                     issuer: data.config?.issuer
                 };
             } catch (error) {
-                return { key, error: error.message };
+                const message = error instanceof Error ? error.message : String(error);
+                return { 
+                    authority: key, 
+                    age: 0, 
+                    expired: true,
+                    error: message 
+                };
             }
         });
     } catch (error) {

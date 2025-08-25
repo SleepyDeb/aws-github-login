@@ -1,16 +1,16 @@
 import React from 'react';
 import './App.css';
-import { AuthProvider } from './contexts/AuthContext.jsx';
+import { AuthProvider } from './contexts/AuthContext.js';
 import { useAuth, useUserProfile } from './hooks/useAuth.js';
-import LoginButton from './components/LoginButton.jsx';
-import LogoutButton from './components/LogoutButton.jsx';
-import OpenConsoleButton, { DebugConsoleButton } from './components/OpenConsoleButton.jsx';
+import LoginButton from './components/LoginButton.js';
+import LogoutButton from './components/LogoutButton.js';
+import OpenConsoleButton, { DebugConsoleButton } from './components/OpenConsoleButton.js';
 
 /**
  * User Info Component
  * Displays authenticated user information
  */
-function UserInfo() {
+function UserInfo(): JSX.Element | null {
   const { user, getDebugInfo } = useAuth();
   const userProfile = useUserProfile();
   
@@ -65,7 +65,7 @@ function UserInfo() {
  * Error Display Component
  * Shows authentication errors with retry option
  */
-function ErrorDisplay() {
+function ErrorDisplay(): JSX.Element | null {
   const { error, clearError } = useAuth();
   
   if (!error) return null;
@@ -102,7 +102,7 @@ function ErrorDisplay() {
 /**
  * Loading Spinner Component
  */
-function LoadingSpinner() {
+function LoadingSpinner(): JSX.Element {
   return (
     <div style={{
       display: 'flex',
@@ -132,7 +132,7 @@ function LoadingSpinner() {
  * Authentication Buttons Component
  * Shows appropriate buttons based on auth state
  */
-function AuthButtons() {
+function AuthButtons(): JSX.Element {
   const { isAuthenticated } = useAuth();
 
   return (
@@ -154,7 +154,7 @@ function AuthButtons() {
  * Main App Content Component
  * Contains the main application UI
  */
-function AppContent() {
+function AppContent(): JSX.Element {
   const { isAuthenticated, isLoading, isInitialized } = useAuth();
 
   // Show loading spinner while initializing
@@ -253,7 +253,7 @@ function AppContent() {
  * Main App Component
  * Wraps the application with AuthProvider
  */
-function App() {
+function App(): JSX.Element {
   return (
     <AuthProvider>
       <AppContent />

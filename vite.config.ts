@@ -9,4 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
   },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
+  }
 })
