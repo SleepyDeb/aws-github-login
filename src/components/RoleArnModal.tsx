@@ -7,7 +7,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { roleArnStorage, roleArnUtils } from '../services/roleArnStorage.js';
 import { useAuthContext } from '../contexts/AuthContext.js';
-import type { RoleArnHistoryItem } from '../types/aws.js';
+import type { RoleArnHistoryItem, AWSCredentials, AWSSessionInfo } from '../types/aws.js';
+import CredentialExporter from './CredentialExporter.js';
 
 interface RoleArnModalProps {
     /** Whether the modal is open */
@@ -22,6 +23,14 @@ interface RoleArnModalProps {
     error?: string | null;
     /** Title of the modal */
     title?: string;
+    /** AWS credentials after successful role assumption */
+    credentials?: AWSCredentials | null;
+    /** AWS session information after successful role assumption */
+    sessionInfo?: AWSSessionInfo | null;
+    /** Callback when user chooses to open console */
+    onOpenConsole?: () => void;
+    /** Callback when user chooses to export credentials */
+    onExportCredentials?: () => void;
 }
 
 /**
@@ -33,7 +42,11 @@ export function RoleArnModal({
     onRoleArnSelected,
     isLoading = false,
     error = null,
-    title = 'Select AWS Role'
+    title = 'Select AWS Role',
+    credentials = null,
+    sessionInfo = null,
+    onOpenConsole,
+    onExportCredentials
 }: RoleArnModalProps): JSX.Element | null {
     const { user: currentUser } = useAuthContext();
     const [roleArn, setRoleArn] = useState<string>('');
@@ -43,6 +56,7 @@ export function RoleArnModal({
     const [showDropdown, setShowDropdown] = useState<boolean>(false);
     const [showTutorial, setShowTutorial] = useState<boolean>(false);
     const [tutorialStep, setTutorialStep] = useState<number>(0);
+    const [modalStep, setModalStep] = useState<'role-selection' | 'success-options' | 'export-credentials'>('role-selection');
 
     // Get OAuth configuration for tutorial
     const getOAuthConfig = useCallback(() => {
@@ -183,6 +197,15 @@ export function RoleArnModal({
         }
     }, [isOpen, roleArn]);
 
+    // Update modal step based on credentials
+    useEffect(() => {
+        if (credentials && sessionInfo && !isLoading) {
+            setModalStep('success-options');
+        } else if (!credentials) {
+            setModalStep('role-selection');
+        }
+    }, [credentials, sessionInfo, isLoading]);
+
     // Reset form when modal closes
     useEffect(() => {
         if (!isOpen) {
@@ -192,6 +215,7 @@ export function RoleArnModal({
             setShowDropdown(false);
             setShowTutorial(false);
             setTutorialStep(0);
+            setModalStep('role-selection');
         }
     }, [isOpen]);
 
@@ -241,6 +265,19 @@ export function RoleArnModal({
         }
         
         onRoleArnSelected(trimmedArn);
+    };
+
+    // Handle export credentials button
+    const handleExportCredentials = () => {
+        setModalStep('export-credentials');
+        if (onExportCredentials) {
+            onExportCredentials();
+        }
+    };
+
+    // Handle back from export to success options
+    const handleBackToSuccess = () => {
+        setModalStep('success-options');
     };
 
     // Handle modal backdrop click
@@ -302,24 +339,30 @@ export function RoleArnModal({
             >
                 {/* Header */}
                 <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>{title}</h2>
+                    <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>
+                        {modalStep === 'success-options' ? 'AWS Console Access Ready' :
+                         modalStep === 'export-credentials' ? 'Export AWS Credentials' :
+                         title}
+                    </h2>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button
-                            onClick={() => setShowTutorial(!showTutorial)}
-                            style={{
-                                background: showTutorial ? '#0366d6' : '#f6f8fa',
-                                border: '1px solid #d0d7de',
-                                borderRadius: '6px',
-                                padding: '6px 12px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                color: showTutorial ? 'white' : '#24292f'
-                            }}
-                            title="Show setup tutorial"
-                        >
-                            📚 Setup Guide
-                        </button>
+                        {modalStep === 'role-selection' && (
+                            <button
+                                onClick={() => setShowTutorial(!showTutorial)}
+                                style={{
+                                    background: showTutorial ? '#0366d6' : '#f6f8fa',
+                                    border: '1px solid #d0d7de',
+                                    borderRadius: '6px',
+                                    padding: '6px 12px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: showTutorial ? 'white' : '#24292f'
+                                }}
+                                title="Show setup tutorial"
+                            >
+                                📚 Setup Guide
+                            </button>
+                        )}
                         <button
                             onClick={onClose}
                             style={{
@@ -342,8 +385,8 @@ export function RoleArnModal({
                     </div>
                 </div>
 
-                {/* Tutorial Section */}
-                {showTutorial && (
+                {/* Tutorial Section - only show in role selection step */}
+                {showTutorial && modalStep === 'role-selection' && (
                     <div style={{
                         backgroundColor: '#f6f8fa',
                         border: '1px solid #d0d7de',
@@ -472,8 +515,9 @@ export function RoleArnModal({
                     </div>
                 )}
 
-                {/* Form */}
-                <form onSubmit={handleSubmit}>
+                {/* Conditional Content Based on Modal Step */}
+                {modalStep === 'role-selection' && (
+                    <form onSubmit={handleSubmit}>
                     {/* Previous roles dropdown */}
                     {roleHistory.length > 0 && (
                         <div style={{ marginBottom: '16px' }}>
@@ -698,6 +742,163 @@ export function RoleArnModal({
                         </button>
                     </div>
                 </form>
+                )}
+
+                {/* Success Options View */}
+                {modalStep === 'success-options' && credentials && sessionInfo && (
+                    <div>
+                        {/* Success Message */}
+                        <div style={{
+                            backgroundColor: '#d4edda',
+                            border: '1px solid #c3e6cb',
+                            borderRadius: '6px',
+                            padding: '16px',
+                            marginBottom: '20px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '20px' }}>✅</span>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#155724' }}>
+                                    AWS Role Successfully Assumed!
+                                </h3>
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#155724' }}>
+                                <div><strong>Role:</strong> {sessionInfo.roleArn}</div>
+                                <div><strong>Session:</strong> {sessionInfo.sessionName}</div>
+                                <div><strong>Expires:</strong> {credentials.Expiration.toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        {/* Action Options */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+                                Choose your next action:
+                            </h4>
+                            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#666' }}>
+                                You can now open the AWS console or export these credentials for CLI/SDK usage.
+                            </p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
+                            <button
+                                onClick={handleExportCredentials}
+                                style={{
+                                    padding: '12px 20px',
+                                    border: '1px solid #0366d6',
+                                    borderRadius: '6px',
+                                    backgroundColor: 'white',
+                                    color: '#0366d6',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    minWidth: '160px',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                📋 Export Credentials
+                            </button>
+                            <button
+                                onClick={onOpenConsole}
+                                style={{
+                                    padding: '12px 20px',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#0366d6',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    minWidth: '160px',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                🚀 Open AWS Console
+                            </button>
+                        </div>
+
+                        {/* Close Button */}
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: '1px solid #d0d7de',
+                                    borderRadius: '6px',
+                                    backgroundColor: 'white',
+                                    color: '#656d76',
+                                    cursor: 'pointer',
+                                    fontSize: '12px'
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Export Credentials View */}
+                {modalStep === 'export-credentials' && credentials && sessionInfo && (
+                    <div>
+                        {/* Back Button */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <button
+                                onClick={handleBackToSuccess}
+                                style={{
+                                    padding: '6px 12px',
+                                    border: '1px solid #d0d7de',
+                                    borderRadius: '6px',
+                                    backgroundColor: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                            >
+                                ← Back to Options
+                            </button>
+                        </div>
+
+                        {/* Credential Exporter */}
+                        <CredentialExporter
+                            credentials={credentials}
+                            sessionInfo={sessionInfo}
+                            onClose={onClose}
+                            onSuccess={() => {
+                                // Optionally show a success message or keep the export view open
+                            }}
+                            inline={true}
+                        />
+
+                        {/* Console Option */}
+                        <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                            <button
+                                onClick={onOpenConsole}
+                                style={{
+                                    padding: '10px 16px',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#0366d6',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: '500',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                🚀 Still Open AWS Console
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Spinner animation */}
                 <style>

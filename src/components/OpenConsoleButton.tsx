@@ -9,7 +9,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { awsService } from '../services/awsService.js';
 import { roleArnStorage } from '../services/roleArnStorage.js';
 import RoleArnModal from './RoleArnModal.js';
-import type { AWSError } from '../types/aws.js';
+import type { AWSError, AWSCredentials, AWSSessionInfo } from '../types/aws.js';
 
 /**
  * Open Console Button Component Props
@@ -44,6 +44,8 @@ export function OpenConsoleButton({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [credentials, setCredentials] = useState<AWSCredentials | null>(null);
+    const [sessionInfo, setSessionInfo] = useState<AWSSessionInfo | null>(null);
 
     const handleClick = async (event: MouseEvent<HTMLButtonElement>): Promise<void> => {
         try {
@@ -100,11 +102,12 @@ export function OpenConsoleButton({
 
             console.log('AWS console URL generated:', result.consoleUrl);
 
-            // Close modal
-            setIsModalOpen(false);
+            // Store credentials and session info for export functionality
+            setCredentials(result.sessionInfo.credentials);
+            setSessionInfo(result.sessionInfo);
 
-            // Redirect to AWS console
-            window.open(result.consoleUrl, '_blank', 'noopener,noreferrer');
+            // Keep modal open to show success state with export/console options
+            // The modal will now show the success state with both export and console buttons
 
         } catch (err) {
             console.error('Failed to assume role and open console:', err);
@@ -147,6 +150,34 @@ export function OpenConsoleButton({
         setIsModalOpen(false);
         setError(null);
         setIsLoading(false);
+        setCredentials(null);
+        setSessionInfo(null);
+    };
+
+    const handleOpenConsole = async (): Promise<void> => {
+        try {
+            if (!sessionInfo || !credentials) {
+                throw new Error('No session information available');
+            }
+
+            // Generate console URL using stored credentials
+            const consoleUrl = await awsService.generateConsoleUrl(credentials);
+            
+            // Close modal
+            setIsModalOpen(false);
+
+            // Redirect to AWS console
+            window.open(consoleUrl, '_blank', 'noopener,noreferrer');
+
+        } catch (err) {
+            console.error('Failed to open console:', err);
+            setError(err instanceof Error ? err.message : 'Failed to open console');
+        }
+    };
+
+    const handleExportCredentials = (): void => {
+        // This will be handled by the modal showing the export interface
+        // The modal state will transition to show export options
     };
 
     // Only show console button if user is authenticated
@@ -204,6 +235,10 @@ export function OpenConsoleButton({
                 isLoading={isLoading}
                 error={error}
                 title="Open AWS Console"
+                credentials={credentials}
+                sessionInfo={sessionInfo}
+                onOpenConsole={handleOpenConsole}
+                onExportCredentials={handleExportCredentials}
             />
         </>
     );
